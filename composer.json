@@ -1,0 +1,22 @@
+{
+    "name": "algenza/json-mocker",
+    "description": "Json API Mocker",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Billy Renyut",
+            "email": "milhanol068@gmail.com"
+        }
+    ],
+    "require": {
+        "algenza/fake-json-generator": "^0.1.0",
+        "symfony/console": "^3.1",
+        "klein/klein": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Algenza\\Json\\Mocker\\": "src/"
+        }
+    }
+}
