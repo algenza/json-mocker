@@ -33,6 +33,7 @@ class Resolver
 		self::initialize();
 
 		if($request->uri() == '/'){
+			$service->data = self::processJson();
 			return self::render($service,'home');
 		}
 
