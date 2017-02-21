@@ -10,7 +10,7 @@
         }
     ],
     "require": {
-        "algenza/fake-json-generator": "^0.1.0",
+        "algenza/fake-json-generator": "^0.1.*",
         "symfony/console": "^3.1",
         "klein/klein": "^2.1"
     },
