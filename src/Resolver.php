@@ -31,7 +31,20 @@ class Resolver
 	public static function run(Request $request, Response $response, ServiceProvider $service)
 	{
 		self::initialize();
-
+		if($request->method()=='GET'){
+			return self::handleGet($request, $response, $service);
+		}else if($request->method()=='POST'){
+			return self::handlePost($request, $response, $service);
+		}else if($request->method()=='PUT'){
+			return self::handlePut($request, $response, $service);
+		}else if($request->method()=='DELETE'){
+			return self::handleDelete($request, $response, $service);
+		}else if($request->method()=='PATCH'){
+			return self::handlePatch($request, $response, $service);
+		}
+		return self::notFound($response);		
+	}
+	private static function handleGet(Request $request, Response $response, ServiceProvider $service){
 		if($request->uri() == '/'){
 			$service->data = self::processJson();
 			return self::render($service,'home');
@@ -48,9 +61,28 @@ class Resolver
 			return self::takeData($response, $uriPart);
 		}
 
-		return self::notFound($response);
+		return self::notFound($response);		
 	}
-
+	private static function handlePost(Request $request, Response $response, ServiceProvider $service){
+		$obj = new \stdClass();
+		$obj->message = "You hit post method";
+		return $response->json($obj);		
+	}
+	private static function handlePut(Request $request, Response $response, ServiceProvider $service){
+		$obj = new \stdClass();
+		$obj->message = "You hit put method";
+		return $response->json($obj);		
+	}
+	private static function handleDelete(Request $request, Response $response, ServiceProvider $service){
+		$obj = new \stdClass();
+		$obj->message = "You hit delete method";
+		return $response->json($obj);		
+	}
+	private static function handlePatch(Request $request, Response $response, ServiceProvider $service){
+		$obj = new \stdClass();
+		$obj->message = "You hit patch method";
+		return $response->json($obj);		
+	}	
 	private static function notFound($response){
 		$response->code(404);
 		$obj = new \stdClass();
