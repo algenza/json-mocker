@@ -5,6 +5,9 @@ use Klein\Request;
 use Klein\Response;
 use Klein\ServiceProvider;
 
+use Algenza\Json\Mocker\Repository;
+use Algenza\Json\Mocker\Validator;
+
 class Resolver
 {
 	private static $initialized = false;
@@ -12,6 +15,9 @@ class Resolver
 	private static $targetJson;
 	private static $viewPath;
 	private static $limit;
+	private static $repository;
+	private static $validator;
+	private static $methodRequireContent = ['POST','PUT','PATCH'];
 
     private static function initialize()
     {
@@ -26,36 +32,144 @@ class Resolver
     	foreach ($config as $key => $value) {
     		self::${$key} = $value;
     	}
+    	self::$repository = new Repository(self::$targetJson);
+    	self::$validator = new Validator;
     }
 
 	public static function run(Request $request, Response $response, ServiceProvider $service)
 	{
 		self::initialize();
+		if(!self::$validator->isValidJson($request->body()) && in_array($request->method(), self::$methodRequireContent)){
+			return self::httpResponse($response,400);	
+		}
 
-		if($request->uri() == '/'){
-			$service->data = self::processJson();
+		if($request->method()=='GET'){
+			return self::handleGet($request, $response, $service);
+		}else if($request->method()=='POST'){
+			return self::handlePost($request, $response, $service);
+		}else if($request->method()=='PUT'){
+			return self::handlePut($request, $response, $service);
+		}else if($request->method()=='DELETE'){
+			return self::handleDelete($request, $response, $service);
+		}else if($request->method()=='PATCH'){
+			return self::handlePatch($request, $response, $service);
+		}
+		return self::httpResponse($response);		
+	}
+
+	private static function handleGet(Request $request, Response $response, ServiceProvider $service){
+		if($request->pathname() == '/'){
+			$service->data =  self::$repository->getAll();
 			return self::render($service,'home');
 		}
 
-		$uriPart = self::extracUri($request->uri());
+		$uriPart = self::extracUri($request->pathname());
 
 		if($uriPart[0]=='db'){
-			$output = self::processJson();
+			$output =  self::$repository->getAll();
 			return $response->json($output);
 		}
 
-		if(self::isValidUri($uriPart)){
-			return self::takeData($response, $uriPart);
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			return self::takeData($response, $uriPart, $request->paramsGet());
 		}
 
-		return self::notFound($response);
+		return self::httpResponse($response);		
 	}
 
-	private static function notFound($response){
-		$response->code(404);
+	private static function handlePost(Request $request, Response $response, ServiceProvider $service){
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart, true)){
+			try {
+				$result =  self::$repository->addData($uriPart[0], $request->body());				
+				$response->code(201);
+				return $response->json($result);				
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);		
+	}
+
+	private static function handlePut(Request $request, Response $response, ServiceProvider $service){
+
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			if($request->headers()->get('Content-Length')==0){
+				return self::httpResponse($response, 400);
+			}
+
+			try {
+				$result =  self::$repository->fullUpdate($uriPart[0], $uriPart[1],$request->body());				
+				return $response->json($result);				
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);			
+	}
+
+	private static function handleDelete(Request $request, Response $response, ServiceProvider $service){
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			try {
+				$result =  self::$repository->delete($uriPart[0], $uriPart[1]);				
+				return self::httpResponse($response, 204);
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);		
+	}
+
+	private static function handlePatch(Request $request, Response $response, ServiceProvider $service){
+
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			if($request->headers()->get('Content-Length')==0){
+				return self::httpResponse($response, 400);
+			}
+
+			try {
+				$result =  self::$repository->partialUpdate($uriPart[0], $uriPart[1],$request->body());				
+				return $response->json($result);				
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);		
+	}	
+
+	private static function httpResponse($response, $code = 404, $data = null){
+		$response->code($code);
 		$obj = new \stdClass();
-		$obj->error = 404;
-		$obj->message = 'Page Not Found';
+		$obj->code = $response->status()->getCode();
+		$obj->message = $response->status()->getMessage();
+
+		if(!is_null($data)){
+			$obj = $data;
+		}
+
 		return $response->json($obj);
 	}
 
@@ -66,45 +180,18 @@ class Resolver
 		return $uriPart;
 	}
 
-	private static function isValidUri($uriPart)
+	private static function takeData($response, $uriPart, $params = null)
 	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
-		if(!isset($fullFile->{$uriPart[0]})){
-			return false;
-		}
-
-		if(isset($uriPart[1])){
-			foreach ($fullFile->{$uriPart[0]} as $item) {
-				if($item->id == $uriPart[1]){
-					return true;
-				}
-			}
-			return false;
-		}
-
-		return true;
-	}
-
-	private static function takeData($response, $uriPart)
-	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
 		if(!isset($uriPart[1])){
-			return $response->json($fullFile->{$uriPart[0]});
+			$data = self::$repository->getDataList($uriPart[0], $params);
+			return $response->json($data);
 		}
 
-		foreach ($fullFile->{$uriPart[0]} as $item) {
-			if($item->id == $uriPart[1]){
-				return $response->json($item);
-			}
+		$data = self::$repository->getData($uriPart[0], $uriPart[1]);
+		if(!$data){
+			return self::httpResponse($response);
 		}
-	}
-
-	private static function processJson($scope = 'db', $id = null)
-	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
-		if($scope == 'db'){
-			return $fullFile;
-		}
+		return $response->json($data);
 	}
 
 	private static function render($service, $view = 'home', array $data = []){
