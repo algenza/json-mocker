@@ -172,7 +172,7 @@ class Resolver
 
 		return $response->json($obj);
 	}
-	
+
 	private static function extracUri($uri)
 	{
 		$uriPart = substr($uri,1);
