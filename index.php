@@ -10,6 +10,13 @@ $klein = new Klein();
 Resolver::config($config);
 
 $klein->respond(function ($request, $response, $service) {
+	if($request->pathname() !== '/' && $request->headers()->get('Content-Type')!=='application/json'){
+		$response->code(415);
+		$obj = new \stdClass();
+		$obj->code = $response->status()->getCode();
+		$obj->message = $response->status()->getMessage();
+		return $response->json($obj);
+	}
     return Resolver::run($request, $response, $service);
 });
 

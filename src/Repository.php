@@ -77,5 +77,34 @@ class Repository
 		return $newdata;
 	}
 
+	public function fullUpdate($object, $id, $content){
+
+		$fullFile = $this->getAll();
+
+		$newItem = json_decode($content);
+
+		foreach ($fullFile->{$object} as &$item) {
+			if($item->id == $id){
+
+				$updatedItem =  new \stdClass();
+				$updatedItem->id = $id;
+
+				foreach ($newItem as $key => $value) {
+					$updatedItem->{$key} = $value; 
+				}
+
+				$item = $updatedItem;
+				
+				if(file_put_contents($this->targetJson,json_encode($fullFile))===false){
+					throw new \Exception("Update Data Failed:".$object.", id:".$id, 1);		
+				}
+
+				return $updatedItem;
+			}
+		}
+
+		throw new \Exception("Item Not Found:".$object.", id:".$id, 1);		
+		
+	}
 
 }
