@@ -1,3 +1,3 @@
 /vendor
-/data/db.json
+/data/db*.json
 composer.lock
