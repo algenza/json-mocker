@@ -17,6 +17,7 @@ class Resolver
 	private static $limit;
 	private static $repository;
 	private static $validator;
+	private static $methodRequireContent = ['POST','PUT','PATCH'];
 
     private static function initialize()
     {
@@ -38,15 +39,13 @@ class Resolver
 	public static function run(Request $request, Response $response, ServiceProvider $service)
 	{
 		self::initialize();
-		if($request->method()=='GET'){
-			return self::handleGet($request, $response, $service);
-		}
-
-		if(!self::$validator->isValidJson($request->body())){
+		if(!self::$validator->isValidJson($request->body()) && in_array($request->method(), self::$methodRequireContent)){
 			return self::httpResponse($response,400);	
 		}
 
-		if($request->method()=='POST'){
+		if($request->method()=='GET'){
+			return self::handleGet($request, $response, $service);
+		}else if($request->method()=='POST'){
 			return self::handlePost($request, $response, $service);
 		}else if($request->method()=='PUT'){
 			return self::handlePut($request, $response, $service);
@@ -106,7 +105,7 @@ class Resolver
 		$uriPart = self::extracUri($request->pathname());
 		if(self::$validator->isValidUri(self::$repository, $uriPart)){
 			if($request->headers()->get('Content-Length')==0){
-				return self::httpResponse($response, 204);
+				return self::httpResponse($response, 400);
 			}
 
 			try {
@@ -116,19 +115,51 @@ class Resolver
 				return self::httpResponse($response, 500);
 			}
 		}
+
 		return self::httpResponse($response);			
 	}
 
 	private static function handleDelete(Request $request, Response $response, ServiceProvider $service){
-		$obj = new \stdClass();
-		$obj->message = "You hit delete method";
-		return $response->json($obj);		
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			try {
+				$result =  self::$repository->delete($uriPart[0], $uriPart[1]);				
+				return self::httpResponse($response, 204);
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);		
 	}
+
 	private static function handlePatch(Request $request, Response $response, ServiceProvider $service){
-		$obj = new \stdClass();
-		$obj->message = "You hit patch method";
-		return $response->json($obj);		
+
+		if($request->pathname() == '/'){
+			return self::httpResponse($response);
+		}
+
+		$uriPart = self::extracUri($request->pathname());
+		if(self::$validator->isValidUri(self::$repository, $uriPart)){
+			if($request->headers()->get('Content-Length')==0){
+				return self::httpResponse($response, 400);
+			}
+
+			try {
+				$result =  self::$repository->partialUpdate($uriPart[0], $uriPart[1],$request->body());				
+				return $response->json($result);				
+			} catch (\Exception $e) {
+				return self::httpResponse($response, 500);
+			}
+		}
+
+		return self::httpResponse($response);		
 	}	
+
 	private static function httpResponse($response, $code = 404, $data = null){
 		$response->code($code);
 		$obj = new \stdClass();
@@ -141,6 +172,7 @@ class Resolver
 
 		return $response->json($obj);
 	}
+	
 	private static function extracUri($uri)
 	{
 		$uriPart = substr($uri,1);

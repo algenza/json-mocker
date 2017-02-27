@@ -8,7 +8,14 @@ class Validator extends FjgValidator
 {
 	public function isValidJson($data)
 	{
-		return ($this->checkJsonFirstChar(substr($data,0,1)) && $this->isJson($data));
+		if($this->checkJsonFirstChar(substr($data,0,1)) && $this->isJson($data)){
+			$obj = json_decode($data);
+			$arr = (array) $obj;
+			if(count($arr)>0){
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public function isValidUri(Repository $repository, $uriPart, $forPost = false)

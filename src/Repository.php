@@ -94,7 +94,7 @@ class Repository
 				}
 
 				$item = $updatedItem;
-				
+
 				if(file_put_contents($this->targetJson,json_encode($fullFile))===false){
 					throw new \Exception("Update Data Failed:".$object.", id:".$id, 1);		
 				}
@@ -105,6 +105,58 @@ class Repository
 
 		throw new \Exception("Item Not Found:".$object.", id:".$id, 1);		
 		
+	}
+
+	public function partialUpdate($object, $id, $content){
+
+		$fullFile = $this->getAll();
+
+		$newFields = json_decode($content);
+
+		foreach ($fullFile->{$object} as &$item) {
+			if($item->id == $id){
+
+				foreach ($newFields as $key => $value) {
+					if($value==null){
+						unset($item->{$key}); 
+					}else{
+						$item->{$key} = $value; 						
+					}
+
+				}
+
+				if(file_put_contents($this->targetJson,json_encode($fullFile))===false){
+					throw new \Exception("Update Data Failed:".$object.", id:".$id, 1);		
+				}
+
+				return $item;
+			}
+		}
+
+		throw new \Exception("Item Not Found:".$object.", id:".$id, 1);		
+		
+	}
+
+	public function delete($object, $id)
+	{
+		$fullFile = $this->getAll();
+		$data = $this->getData($object, $id);
+		$ObjectCollection = $fullFile->{$object};
+
+		$newCollection = array_filter($ObjectCollection, function ($obj) use ($data){
+			if($obj == $data){
+				return false;
+			}
+			return true;
+		});
+
+		$fullFile->{$object} = $newCollection;
+
+		if(file_put_contents($this->targetJson,json_encode($fullFile))===false){
+			throw new \Exception("Update Data Failed:".$object.", id:".$id, 1);		
+		}
+
+		return $data;
 	}
 
 }
