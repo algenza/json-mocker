@@ -5,6 +5,8 @@ use Klein\Request;
 use Klein\Response;
 use Klein\ServiceProvider;
 
+use Algenza\Json\Mocker\Repository;
+
 class Resolver
 {
 	private static $initialized = false;
@@ -12,6 +14,7 @@ class Resolver
 	private static $targetJson;
 	private static $viewPath;
 	private static $limit;
+	private static $repository;
 
     private static function initialize()
     {
@@ -26,6 +29,7 @@ class Resolver
     	foreach ($config as $key => $value) {
     		self::${$key} = $value;
     	}
+    	self::$repository = new Repository(self::$targetJson);
     }
 
 	public static function run(Request $request, Response $response, ServiceProvider $service)
@@ -42,18 +46,19 @@ class Resolver
 		}else if($request->method()=='PATCH'){
 			return self::handlePatch($request, $response, $service);
 		}
-		return self::notFound($response);		
+		return self::error($response);		
 	}
+
 	private static function handleGet(Request $request, Response $response, ServiceProvider $service){
 		if($request->pathname() == '/'){
-			$service->data = self::processJson();
+			$service->data =  self::$repository->getAll();
 			return self::render($service,'home');
 		}
 
 		$uriPart = self::extracUri($request->pathname());
 
 		if($uriPart[0]=='db'){
-			$output = self::processJson();
+			$output =  self::$repository->getAll();
 			return $response->json($output);
 		}
 
@@ -61,48 +66,34 @@ class Resolver
 			return self::takeData($response, $uriPart, $request->paramsGet());
 		}
 
-		return self::notFound($response);		
+		return self::error($response);		
 	}
+
 	private static function handlePost(Request $request, Response $response, ServiceProvider $service){
 		if($request->pathname() == '/'){
-			return self::notFound($response);
+			return self::error($response);
 		}
+
 		$uriPart = self::extracUri($request->pathname());
 		if(self::isValidUri($uriPart, true)){
-			return self::saveData($response, $uriPart, $request->body());
+			try {
+				$result =  self::$repository->addData($uriPart[0], $request->body());				
+				$response->code(201);
+				return $response->json($result);				
+			} catch (\Exception $e) {
+				return self::error($response, 500);
+			}
 		}
 
-		return self::notFound($response);		
+		return self::error($response);		
 	}
-	private static function saveData($response, $uriPart, $params){
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
-		$maxid = 1;
-		if(isset($fullFile->{$uriPart[0]})){
-			foreach ($fullFile->{$uriPart[0]} as $item) {
-				if($item->id > $maxid){
-					$maxid = $item->id;
-				}
-			}			
-		}
-		$newdata = new \stdClass();;
-		$newdata->id = (int)$maxid+1;
-		$data = json_decode($params);
-		if($data->id){
-			unset($data->id);
-		}
-		foreach ($data as $key => $value) {
-			$newdata->{$key} = $value; 
-		}
-		$fullFile->{$uriPart[0]}[] = $newdata;
-		file_put_contents(self::$targetJson,json_encode($fullFile));
 
-		return $response->json($newdata);		
-	}
 	private static function handlePut(Request $request, Response $response, ServiceProvider $service){
 		$obj = new \stdClass();
 		$obj->message = "You hit put method";
 		return $response->json($obj);		
 	}
+
 	private static function handleDelete(Request $request, Response $response, ServiceProvider $service){
 		$obj = new \stdClass();
 		$obj->message = "You hit delete method";
@@ -113,11 +104,11 @@ class Resolver
 		$obj->message = "You hit patch method";
 		return $response->json($obj);		
 	}	
-	private static function notFound($response){
-		$response->code(404);
+	private static function error($response, $code = 404){
+		$response->code($code);
 		$obj = new \stdClass();
-		$obj->error = 404;
-		$obj->message = 'Page Not Found';
+		$obj->code = $response->status()->getCode();
+		$obj->message = $response->status()->getMessage();
 		return $response->json($obj);
 	}
 	private static function extracUri($uri)
@@ -129,7 +120,7 @@ class Resolver
 
 	private static function isValidUri($uriPart, $forPost = false)
 	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
+		$fullFile = self::$repository->getAll();
 		if(!isset($fullFile->{$uriPart[0]})){
 			return false;
 		}
@@ -153,41 +144,16 @@ class Resolver
 
 	private static function takeData($response, $uriPart, $params = null)
 	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
 		if(!isset($uriPart[1])){
-			if(!$params){
-				return $response->json($fullFile->{$uriPart[0]});
-			}
-
-			$filteredData = array_filter($fullFile->{$uriPart[0]}, function ($obj) use ($params){
-				foreach ($params as $key => $value) {
-					if(isset($obj->{$key})){
-						if(strpos(strtolower($obj->{$key}),strtolower($value))===false){
-							return false;
-						}
-					}else{
-						return false;
-					}
-				}
-				return true;
-			});
-
-			return $response->json($filteredData);
+			$data = self::$repository->getDataList($uriPart[0], $params);
+			return $response->json($data);
 		}
 
-		foreach ($fullFile->{$uriPart[0]} as $item) {
-			if($item->id == $uriPart[1]){
-				return $response->json($item);
-			}
+		$data = self::$repository->getData($uriPart[0], $uriPart[1]);
+		if(!$data){
+			return self::error($response);
 		}
-	}
-
-	private static function processJson($scope = 'db', $id = null)
-	{
-		$fullFile = json_decode(file_get_contents(self::$targetJson));
-		if($scope == 'db'){
-			return $fullFile;
-		}
+		return $response->json($data);
 	}
 
 	private static function render($service, $view = 'home', array $data = []){
