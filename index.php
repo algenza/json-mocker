@@ -10,7 +10,9 @@ $klein = new Klein();
 Resolver::config($config);
 
 $klein->respond(function ($request, $response, $service) {
-	if($request->pathname() !== '/' && $request->headers()->get('Content-Type')!=='application/json'){
+	$response->header('Access-Control-Allow-Origin','*');
+	if($request->pathname() !== '/' && $request->headers()->get('Content-Type')!=='application/json' && $request->method()!='GET'){
+
 		$response->code(415);
 		$obj = new \stdClass();
 		$obj->code = $response->status()->getCode();

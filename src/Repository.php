@@ -17,7 +17,6 @@ class Repository
 	public function getDataList($object, $params = null)
 	{
 		$fullFile = $this->getAll();
-
 		$filteredData = array_filter($fullFile->{$object}, function ($obj) use ($params){
 			foreach ($params as $key => $value) {
 				if(isset($obj->{$key})){
