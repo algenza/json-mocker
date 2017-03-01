@@ -53,6 +53,8 @@ class Resolver
 			return self::handleDelete($request, $response, $service);
 		}else if($request->method()=='PATCH'){
 			return self::handlePatch($request, $response, $service);
+		}else if($request->method()=='OPTIONS'){
+			return self::httpResponse($response,200);		
 		}
 		return self::httpResponse($response);		
 	}
