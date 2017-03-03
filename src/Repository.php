@@ -17,7 +17,6 @@ class Repository
 	public function getDataList($object, $params = null)
 	{
 		$fullFile = $this->getAll();
-
 		$filteredData = array_filter($fullFile->{$object}, function ($obj) use ($params){
 			foreach ($params as $key => $value) {
 				if(isset($obj->{$key})){
@@ -141,22 +140,21 @@ class Repository
 	{
 		$fullFile = $this->getAll();
 		$data = $this->getData($object, $id);
-		$ObjectCollection = $fullFile->{$object};
-
-		$newCollection = array_filter($ObjectCollection, function ($obj) use ($data){
-			if($obj == $data){
-				return false;
+		$newData = [];
+		foreach ($fullFile->{$object} as $record) {
+			if($data != $record){
+				$newData[]=$record;
 			}
-			return true;
-		});
-
-		$fullFile->{$object} = $newCollection;
-
-		if(file_put_contents($this->targetJson,json_encode($fullFile))===false){
+		}
+		$fullFile->{$object} = $newData;
+		$result = file_put_contents($this->targetJson,json_encode($fullFile));
+		if($result===false){
 			throw new \Exception("Update Data Failed:".$object.", id:".$id, 1);		
 		}
 
-		return $data;
+		return true;
+		return false;
+
 	}
 
 }

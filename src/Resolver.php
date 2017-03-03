@@ -53,6 +53,8 @@ class Resolver
 			return self::handleDelete($request, $response, $service);
 		}else if($request->method()=='PATCH'){
 			return self::handlePatch($request, $response, $service);
+		}else if($request->method()=='OPTIONS'){
+			return self::httpResponse($response,200);		
 		}
 		return self::httpResponse($response);		
 	}
@@ -127,8 +129,11 @@ class Resolver
 		$uriPart = self::extracUri($request->pathname());
 		if(self::$validator->isValidUri(self::$repository, $uriPart)){
 			try {
-				$result =  self::$repository->delete($uriPart[0], $uriPart[1]);				
-				return self::httpResponse($response, 204);
+				$result =  self::$repository->delete($uriPart[0], $uriPart[1]);
+				if($result){
+					return self::httpResponse($response, 204);					
+				}			
+				return self::httpResponse($response, 500);
 			} catch (\Exception $e) {
 				return self::httpResponse($response, 500);
 			}
