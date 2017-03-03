@@ -13,7 +13,7 @@ $klein->respond(function ($request, $response, $service) {
 	$filteredMethod = ['PUT','PATCH','POST'];
 	$response->header('Access-Control-Allow-Origin','*');
 	$response->header('Access-Control-Allow-Headers','Content-Type');
-	$response->header('Access-Control-Allow-Methods','GET, POST, PUT');
+	$response->header('Access-Control-Allow-Methods','GET, POST, PUT, DELETE');
 	file_put_contents('request.json', $request->headers()->get('Content-Type'));
 	if($request->pathname() !== '/' 
 		&& $request->headers()->get('Content-Type')!=='application/json'
